@@ -10,7 +10,7 @@ ESTADOS_ALVO = [
     "ES", "MG", "RJ", "SP"
 ]
 
-# Ordem EXATA do enunciado e do CSV (no_entidade primeiro, co_entidade em segundo)
+
 COLUNAS_EXATAS = [
     "no_entidade", "co_entidade", "no_uf", "sg_uf", "co_uf",
     "no_municipio", "co_municipio", "nu_ano_censo", "qt_mat_bas",
@@ -21,8 +21,7 @@ COLUNAS_EXATAS = [
 def executar_migracao():
     conn = sqlite3.connect(BANCO_DADOS)
     cursor = conn.cursor()
-
-    # Criação da tabela seguindo a ordem exata do professor
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS instituicoes (
             no_entidade TEXT,
@@ -44,7 +43,7 @@ def executar_migracao():
     """)
     conn.commit()
 
-    leitor = pandas.read_csv(
+    leitorCaractere = pandas.read_csv(
         ARQUIVO_CSV,
         sep=";",
         encoding="latin1",
@@ -52,19 +51,28 @@ def executar_migracao():
         low_memory=False
     )
 
-    for bloco in leitor:
+    for bloco in leitorCaractere:
+
         bloco.columns = bloco.columns.str.lower().str.replace('ï»¿', '')
         
-        # Garante a filtragem e a ordem exata das colunas
-        colunas_filtradas = [c for c in COLUNAS_EXATAS if c in bloco.columns]
-        bloco = bloco[colunas_filtradas]
-        bloco_filtrado = bloco[bloco['sg_uf'].isin(ESTADOS_ALVO)]
+        
+        colunasFiltradas = [coluna for coluna in COLUNAS_EXATAS if coluna in bloco.columns]
 
-        if not bloco_filtrado.empty:
-            bloco_filtrado.to_sql('instituicoes', conn, if_exists='append', index=False)
+
+        bloco = bloco[colunasFiltradas]
+
+
+        blocoFiltrado = bloco[bloco['sg_uf'].isin(ESTADOS_ALVO)]
+
+
+        if not blocoFiltrado.empty:
+
+
+            blocoFiltrado.to_sql('instituicoes', conn, if_exists='append', index=False)
+
 
     conn.close()
-    print("Migração concluída com sucesso na ordem exata solicitada!")
+
 
 if __name__ == "__main__":
     executar_migracao()
