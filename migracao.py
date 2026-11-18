@@ -1,9 +1,14 @@
 import pandas
-import sqlite3
+import os
+from sqlalchemy import create_engine
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 ARQUIVO_CSV = "Tabela_Escola_2025_V2.csv"
-BANCO_DADOS = "censo_escolar.db"
 TAMANHO_BLOCO = 50000
+
 
 ESTADOS_ALVO = [
     "AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE",
@@ -18,30 +23,19 @@ COLUNAS_EXATAS = [
     "qt_mat_eja", "qt_mat_esp"
 ]
 
+
+
 def executar_migracao():
-    conn = sqlite3.connect(BANCO_DADOS)
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS instituicoes (
-            no_entidade TEXT,
-            co_entidade INTEGER PRIMARY KEY,
-            no_uf TEXT,
-            sg_uf TEXT,
-            co_uf INTEGER,
-            no_municipio TEXT,
-            co_municipio INTEGER,
-            nu_ano_censo INTEGER,
-            qt_mat_bas INTEGER,
-            qt_mat_inf INTEGER,
-            qt_mat_fund INTEGER,
-            qt_mat_med INTEGER,
-            qt_mat_prof INTEGER,
-            qt_mat_eja INTEGER,
-            qt_mat_esp INTEGER
-        )
-    """)
-    conn.commit()
+
+
+
+    BancoDados_url = f"postgresql+psycopg2://{os.getenv('DB_USER')}:{os.getenv('DB_PASS')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
+
+
+
+
+
+    engine = create_engine(BancoDados_url)
 
     leitorCaractere = pandas.read_csv(
         ARQUIVO_CSV,
@@ -51,27 +45,38 @@ def executar_migracao():
         low_memory=False
     )
 
-    for bloco in leitorCaractere:
+    blocos_inseridos = 0
 
+
+
+
+
+
+    for bloco in leitorCaractere:
+        
         bloco.columns = bloco.columns.str.lower().str.replace('ï»¿', '')
         
-        
-        colunasFiltradas = [coluna for coluna in COLUNAS_EXATAS if coluna in bloco.columns]
+        for coluna in COLUNAS_EXATAS:
+            if coluna not in bloco.columns:
+                bloco[coluna] = 0
 
+        bloco = bloco[COLUNAS_EXATAS]
 
-        bloco = bloco[colunasFiltradas]
-
+        bloco = bloco.fillna(0)
 
         blocoFiltrado = bloco[bloco['sg_uf'].isin(ESTADOS_ALVO)]
 
 
+
+
+
         if not blocoFiltrado.empty:
+            blocoFiltrado.to_sql('instituicoes', engine, if_exists='append', index=False)
+            
+            blocos_inseridos += 1
+            
 
 
-            blocoFiltrado.to_sql('instituicoes', conn, if_exists='append', index=False)
-
-
-    conn.close()
 
 
 if __name__ == "__main__":
